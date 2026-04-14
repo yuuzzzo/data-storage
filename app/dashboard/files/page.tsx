@@ -46,10 +46,24 @@ export default function UploadPage() {
         body: formData,
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get("content-type") || "";
+      let data: { error?: string } | null = null;
+
+      if (contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        data = { error: text || res.statusText };
+      }
 
       if (!res.ok) {
-        throw new Error(data.error || "Erro ao fazer upload do arquivo");
+        let message = data?.error || `Erro ao fazer upload do arquivo (${res.status})`;
+        if (res.status === 413) {
+          message = message.includes("Request Entity Too Large")
+            ? "Arquivo muito grande para o servidor. Tente um arquivo menor ou verifique o limite de upload do deploy."
+            : message;
+        }
+        throw new Error(message);
       }
 
       setMessage({ 
