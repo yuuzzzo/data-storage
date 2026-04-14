@@ -21,14 +21,28 @@ export async function POST(request: Request) {
         { status: 400 },
       );
 
+    // Valida tamanho do arquivo (50MB máximo)
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxSize) {
+      return NextResponse.json(
+        { error: `Arquivo muito grande. Máximo permitido: 50MB. Você enviou: ${(file.size / (1024 * 1024)).toFixed(2)}MB` },
+        { status: 413 },
+      );
+    }
     
+    // Sanitiza nome mantendo estrutura válida
     const sanitizedName = file.name
       .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/[^a-zA-Z0-9.-]/g, "");
-    const fileName = `${Date.now()}-${sanitizedName}`;
-    const { data: storageData, error: storageError } = await supabase.storage
+      .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+      .trim();
+      
+    // Remove apenas caracteres realmente problemáticos (não mantém espaços em branco múltiplos)
+    const safeFileName = sanitizedName
+      .replace(/\s+/g, "_") // Espaços viram underscores (preserva legibilidade)
+      .replace(/[<>:"|?*]/g, ""); // Remove caracteres inválidos em nomes de arquivo
+      
+    const fileName = `${Date.now()}-${safeFileName}`;
+    const { error: storageError } = await supabase.storage
       .from("my-files")
       .upload(fileName, file);
 
@@ -55,7 +69,7 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET(request: Request) {
+export async function GET() {
   try{
     const res = await prisma.files.findMany();
     return Response.json(res, {status: 200});
