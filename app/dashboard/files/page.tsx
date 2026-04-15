@@ -3,21 +3,33 @@
 import { useState } from "react";
 import Link from "next/link";
 import styles from "./page.module.css";
+import { supabaseClient } from "../../lib/supabaseClient";
+import {
+  ALLOWED_EXTENSIONS,
+  MAX_FILE_SIZE,
+  createStorageFileName,
+  formatSize,
+  getFileExtension,
+} from "../../lib/fileUtils";
 
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [nome, setNome] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
-  // Auto-detecta extensão quando arquivo é selecionado
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0] || null;
     setFile(selectedFile);
-    
-    // Auto-preenche nome se vazio
+
     if (selectedFile && !nome) {
-      const nameWithoutExtension = selectedFile.name.split(".").slice(0, -1).join(".");
+      const nameWithoutExtension = selectedFile.name
+        .split(".")
+        .slice(0, -1)
+        .join(".");
       setNome(nameWithoutExtension || selectedFile.name);
     }
   };
@@ -28,6 +40,23 @@ export default function UploadPage() {
       return;
     }
 
+    const extension = getFileExtension(file.name);
+    if (!ALLOWED_EXTENSIONS.includes(extension)) {
+      setMessage({
+        type: "error",
+        text: `Tipo de arquivo não permitido: .${extension}`,
+      });
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      setMessage({
+        type: "error",
+        text: `Arquivo muito grande. Máximo permitido: ${formatSize(MAX_FILE_SIZE)}`,
+      });
+      return;
+    }
+
     if (!nome.trim()) {
       setMessage({ type: "error", text: "Digite um nome para o arquivo!" });
       return;
@@ -35,49 +64,59 @@ export default function UploadPage() {
 
     setUploading(true);
     setMessage(null);
-    
+
+    const storageFileName = createStorageFileName(file.name);
+    let uploadCompleted = false;
+
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("nome", nome.trim());
+      const { error: uploadError } = await supabaseClient.storage
+        .from("my-files")
+        .upload(storageFileName, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type || "application/octet-stream",
+        });
 
-      const res = await fetch("/api/files", {
+      if (uploadError) {
+        throw new Error(`Erro no upload do storage: ${uploadError.message}`);
+      }
+
+      uploadCompleted = true;
+
+      const response = await fetch("/api/files", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          nome: nome.trim() || file.name,
+          fileName: storageFileName,
+          tipo: extension,
+        }),
       });
 
-      const contentType = res.headers.get("content-type") || "";
-      let data: { error?: string } | null = null;
-
-      if (contentType.includes("application/json")) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        data = { error: text || res.statusText };
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(
+          data?.error || `Erro ao salvar metadados (${response.status})`,
+        );
       }
 
-      if (!res.ok) {
-        let message = data?.error || `Erro ao fazer upload do arquivo (${res.status})`;
-        if (res.status === 413) {
-          message = message.includes("Request Entity Too Large")
-            ? "Arquivo muito grande para o servidor. Tente um arquivo menor ou verifique o limite de upload do deploy."
-            : message;
-        }
-        throw new Error(message);
-      }
-
-      setMessage({ 
-        type: "success", 
-        text: `✓ ${file.name} enviado com sucesso!` 
+      setMessage({
+        type: "success",
+        text: `✓ ${file.name} enviado com sucesso!`,
       });
-      
       setFile(null);
       setNome("");
-      
-      // Limpa mensagem após 3 segundos
+
       setTimeout(() => setMessage(null), 3000);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
+      if (uploadCompleted) {
+        await supabaseClient.storage.from("my-files").remove([storageFileName]);
+      }
+
+      const errorMessage =
+        error instanceof Error ? error.message : "Erro desconhecido";
       setMessage({ type: "error", text: `✗ ${errorMessage}` });
       console.error(error);
     } finally {
@@ -114,8 +153,8 @@ export default function UploadPage() {
           <label className={styles.inputWrapper}>
             <div className={styles.fileLabel}>
               <span>
-                {file 
-                  ? `${file.name} (${(file.size / (1024 * 1024)).toFixed(2)}MB)` 
+                {file
+                  ? `${file.name} (${formatSize(file.size)})`
                   : "Selecione um arquivo"}
               </span>
               <strong>Escolher</strong>
@@ -128,7 +167,7 @@ export default function UploadPage() {
           </label>
 
           {message && (
-            <div 
+            <div
               className={`${styles.message} ${styles[`message-${message.type}`]}`}
               role="alert"
             >
@@ -136,25 +175,26 @@ export default function UploadPage() {
             </div>
           )}
 
-          <button 
-            type="button" 
-            className={styles.button} 
-            onClick={handleUpload} 
+          <button
+            type="button"
+            className={styles.button}
+            onClick={handleUpload}
             disabled={uploading || !file}
           >
             {uploading ? "Enviando..." : "Subir para a nuvem"}
           </button>
-          
+
           <Link href="/dashboard/files/saved" className={styles.button}>
             Ver Arquivos Salvos
           </Link>
-          
+
           <Link href="/dashboard" className={styles.backButton}>
             Voltar ao Dashboard
           </Link>
-          
+
           <p className={styles.note}>
-            ✓ Suporta: PDF, DOC, XLS, PPT, JPG, PNG, ZIP, EXE, MSI, DEB, RPM, APK e mais
+            ✓ Suporta: PDF, DOC, XLS, PPT, JPG, PNG, ZIP, EXE, MSI, DEB, RPM,
+            APK e mais
           </p>
         </div>
       </section>

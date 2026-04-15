@@ -12,6 +12,7 @@ interface LinkData {
 
 export default function SavedLinksPage() {
   const [links, setLinks] = useState<LinkData[]>([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,6 +37,15 @@ export default function SavedLinksPage() {
     loadLinks();
   }, []);
 
+  const filteredLinks = links.filter((link) => {
+    const query = search.toLowerCase().trim();
+    if (!query) return true;
+    return (
+      link.titulo?.toLowerCase().includes(query) ||
+      link.url.toLowerCase().includes(query)
+    );
+  });
+
   return (
     <main className={styles.container}>
       <section className={styles.panel}>
@@ -52,20 +62,37 @@ export default function SavedLinksPage() {
         <div className={styles.filesSection}>
           <h2 className={styles.filesTitle}>Links disponíveis</h2>
 
-          {loading && <p className={styles.emptyMessage}>Carregando links...</p>}
+          <div className={styles.searchBar}>
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Pesquisar por título ou URL"
+              className={styles.searchInput}
+              aria-label="Pesquisar links"
+            />
+          </div>
+
+          {loading && (
+            <p className={styles.emptyMessage}>Carregando links...</p>
+          )}
           {error && <p className={styles.errorMessage}>{error}</p>}
-          {!loading && !error && links.length === 0 && (
+          {!loading && !error && filteredLinks.length === 0 && (
             <p className={styles.emptyMessage}>
-              Nenhum link salvo ainda. Volte para cadastrar links novos.
+              {links.length === 0
+                ? "Nenhum link salvo ainda. Volte para cadastrar links novos."
+                : `Nenhum link encontrado para "${search}".`}
             </p>
           )}
 
-          {!loading && links.length > 0 && (
+          {!loading && filteredLinks.length > 0 && (
             <div className={styles.filesList}>
-              {links.map((link) => (
+              {filteredLinks.map((link) => (
                 <div key={link.id} className={styles.fileItem}>
                   <div className={styles.fileInfo}>
-                    <span className={styles.fileName}>{link.titulo || link.url}</span>
+                    <span className={styles.fileName}>
+                      {link.titulo || link.url}
+                    </span>
                     <span className={styles.fileType}>{link.url}</span>
                   </div>
                   <a

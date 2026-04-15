@@ -1,130 +1,99 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import { createClient } from "@supabase/supabase-js";
-
-const prisma = new PrismaClient();
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
-
-// Whitelist de extensões permitidas (mantém arquivo.tipo em minúscula)
-const ALLOWED_EXTENSIONS = [
-  "pdf", "doc", "docx", "txt", "xlsx", "xls", "ppt", "pptx",
-  "jpg", "jpeg", "png", "gif", "bmp", "svg", "webp", "ico",
-  "zip", "rar", "7z", "tar", "gz",
-  "exe", "msi", "app", "deb", "rpm", "apk",
-  "mp3", "mp4", "avi", "mkv", "mov", "flv", "webm", "m4a",
-  "iso", "bin", "jar", "py", "js", "ts", "tsx", "jsx", "html", "css"
-];
+import { prisma } from "../../lib/prisma";
+import { supabaseServer } from "../../lib/supabaseServer";
+import { ALLOWED_EXTENSIONS, getFileExtension } from "../../lib/fileUtils";
 
 export async function POST(request: Request) {
   try {
-    const formData = await request.formData();
-    const file = formData.get("file") as File;
-    const nome = formData.get("nome") as string;
+    const body = await request.json();
+    const nome = String(body.nome ?? "").trim();
+    const fileName = String(body.fileName ?? "").trim();
+    const tipo = String(body.tipo ?? "")
+      .toLowerCase()
+      .trim();
 
-    if (!file)
+    if (!fileName) {
       return NextResponse.json(
-        { error: "Arquivo não enviado" },
+        { error: "O nome do arquivo no storage não foi informado." },
         { status: 400 },
       );
+    }
 
-    // Extrai extensão do arquivo
-    const fileNameParts = file.name.split(".");
-    const extension = fileNameParts.length > 1
-      ? fileNameParts[fileNameParts.length - 1].toLowerCase()
-      : "unknown";
-
-    // Valida extension permitida
-    if (!ALLOWED_EXTENSIONS.includes(extension)) {
+    if (!nome) {
       return NextResponse.json(
-        { 
-          error: `Tipo de arquivo não permitido: .${extension}. Tipos aceitos: ${ALLOWED_EXTENSIONS.join(", ")}`
-        },
+        { error: "O nome exibido do arquivo não foi informado." },
+        { status: 400 },
+      );
+    }
+
+    if (!tipo || !ALLOWED_EXTENSIONS.includes(tipo)) {
+      return NextResponse.json(
+        { error: `Tipo de arquivo não permitido: .${tipo}` },
         { status: 415 },
       );
     }
 
-    // Valida tamanho do arquivo (100MB máximo)
-    const maxSize = 100 * 1024 * 1024; // 100MB
-    if (file.size > maxSize) {
+    const extensionFromFileName = getFileExtension(fileName);
+    if (extensionFromFileName !== tipo) {
       return NextResponse.json(
-        { 
-          error: `Arquivo muito grande. Máximo permitido: 100MB. Arquivo: ${(file.size / (1024 * 1024)).toFixed(2)}MB`
-        },
-        { status: 413 },
+        { error: "A extensão do arquivo não corresponde ao tipo informado." },
+        { status: 400 },
       );
     }
-    
-    // Sanitiza nome mantendo estrutura válida
-    const sanitizedName = file.name
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "") // Remove acentos
-      .trim();
-      
-    // Remove apenas caracteres realmente problemáticos
-    const safeFileName = sanitizedName
-      .replace(/\s+/g, "_") // Espaços viram underscores
-      .replace(/[<>:"|?*]/g, ""); // Remove caracteres inválidos
 
-    const fileName = `${Date.now()}-${safeFileName}`;
-    
-    // Upload para Supabase Storage
-    const { error: storageError } = await supabase.storage
-      .from("my-files")
-      .upload(fileName, file);
-
-    if (storageError) {
-      console.error("Storage error:", storageError);
-      throw new Error(`Erro ao fazer upload no storage: ${storageError.message}`);
+    if (
+      fileName.includes("..") ||
+      fileName.includes("\\") ||
+      fileName.includes("//")
+    ) {
+      return NextResponse.json(
+        { error: "Nome do arquivo inválido." },
+        { status: 400 },
+      );
     }
 
-    // Obtém URL pública
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from("my-files").getPublicUrl(fileName);
+    const { data } = supabaseServer.storage
+      .from("my-files")
+      .getPublicUrl(fileName);
 
-    // Salva no banco de dados
+    if (!data?.publicUrl) {
+      console.error("Public URL not available for file:", fileName);
+      return NextResponse.json(
+        { error: "Não foi possível obter a URL pública do arquivo." },
+        { status: 500 },
+      );
+    }
+
     const newFile = await prisma.files.create({
       data: {
-        nome: nome || file.name,
-        storagePath: publicUrl,
-        tipo: extension
-      }
+        nome,
+        storagePath: data.publicUrl,
+        tipo,
+      },
     });
 
-    return NextResponse.json(
-      { 
-        success: true, 
-        file: newFile,
-        message: `Arquivo ${file.name} enviado com sucesso!`
-      }, 
-      { status: 201 }
-    );
+    return NextResponse.json({ success: true, file: newFile }, { status: 201 });
   } catch (error) {
-    console.error("Upload error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Erro desconhecido ao fazer upload";
-    return NextResponse.json(
-      { error: errorMessage }, 
-      { status: 500 }
-    );
+    console.error("Upload metadata error:", error);
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Erro desconhecido ao salvar metadados";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 
 export async function GET() {
   try {
-    const res = await prisma.files.findMany({
+    const files = await prisma.files.findMany({
       orderBy: {
-        createdAt: "desc"
-      }
+        createdAt: "desc",
+      },
     });
-    return Response.json(res, { status: 200 });
+
+    return Response.json(files, { status: 200 });
   } catch (error) {
     console.error("Fetch error:", error);
-    return Response.json(
-      { error: "Erro ao buscar arquivos" }, 
-      { status: 500 }
-    );
+    return Response.json({ error: "Erro ao buscar arquivos" }, { status: 500 });
   }
 }

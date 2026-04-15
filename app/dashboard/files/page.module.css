@@ -8,14 +8,23 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  background: radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 25%),
-    radial-gradient(circle at bottom right, rgba(255, 255, 255, 0.04), transparent 30%),
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(255, 255, 255, 0.08),
+      transparent 25%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(255, 255, 255, 0.04),
+      transparent 30%
+    ),
     #050505;
   color: #f8f8f8;
 }
 
 .panel {
-  width: min(720px, 100%);
+  width: min(1080px, 100%);
   padding: 2.5rem;
   border-radius: 28px;
   backdrop-filter: blur(20px);
@@ -123,18 +132,27 @@
   font-weight: 700;
   font-size: 1rem;
   cursor: pointer;
-  transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 16px 48px rgba(255, 255, 255, 0.05);
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    filter 0.25s ease;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 16px 48px rgba(255, 255, 255, 0.05);
 }
 
 .button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.24), 0 24px 64px rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.24),
+    0 24px 64px rgba(255, 255, 255, 0.12);
 }
 
 .button:active {
   transform: translateY(0);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14), 0 12px 30px rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 12px 30px rgba(255, 255, 255, 0.08);
 }
 .backButton {
   display: inline-flex;
@@ -148,14 +166,20 @@
   color: #ffffff;
   font-weight: 700;
   text-decoration: none;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 16px 48px rgba(255, 255, 255, 0.05);
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 16px 48px rgba(255, 255, 255, 0.05);
   margin-top: 1rem;
 }
 
 .backButton:hover {
   transform: translateY(-2px);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.24), 0 24px 64px rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.24),
+    0 24px 64px rgba(255, 255, 255, 0.12);
 }
 
 .emptyMessage,
@@ -188,16 +212,40 @@
   margin-bottom: 1rem;
 }
 
+.searchBar {
+  margin-bottom: 1rem;
+}
+
+.searchInput {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #f8f8f8;
+  padding: 0.9rem 1rem;
+  font-size: 0.98rem;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.searchInput:focus {
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+}
+
 .filesList {
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.9rem;
+  align-items: start;
 }
 
 .fileItem {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem;
   padding: 1rem 1.2rem;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.05);
@@ -205,6 +253,52 @@
   transition: all 0.3s ease;
   animation: slideIn 0.6s ease-out both;
   opacity: 0;
+  min-height: 130px;
+  width: 100%;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .fileItem {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 740px) {
+  .filesList {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fileInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.fileName,
+.fileType,
+.downloadButton {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.downloadButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  white-space: normal;
+}
+
+.downloadButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  max-width: 100%;
+  white-space: normal;
 }
 
 .fileItem:hover {
@@ -240,12 +334,16 @@
   font-weight: 600;
   font-size: 0.9rem;
   transition: all 0.3s ease;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 10px 24px rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 10px 24px rgba(255, 255, 255, 0.06);
 }
 
 .downloadButton:hover {
   transform: scale(1.05);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.24), 0 12px 30px rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.24),
+    0 12px 30px rgba(255, 255, 255, 0.12);
 }
 
 @keyframes fadeIn {

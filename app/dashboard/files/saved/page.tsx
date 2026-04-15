@@ -13,6 +13,7 @@ interface FileData {
 
 export default function SavedFilesPage() {
   const [files, setFiles] = useState<FileData[]>([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,6 +38,15 @@ export default function SavedFilesPage() {
     loadFiles();
   }, []);
 
+  const filteredFiles = files.filter((file) => {
+    const query = search.toLowerCase().trim();
+    if (!query) return true;
+    return (
+      file.nome.toLowerCase().includes(query) ||
+      file.tipo.toLowerCase().includes(query)
+    );
+  });
+
   return (
     <main className={styles.container}>
       <section className={styles.panel}>
@@ -51,19 +61,36 @@ export default function SavedFilesPage() {
         </header>
 
         <div className={styles.filesSection}>
-          <h2 className={styles.filesTitle}>Arquivos disponíveis para download</h2>
+          <h2 className={styles.filesTitle}>
+            Arquivos disponíveis para download
+          </h2>
 
-          {loading && <p className={styles.emptyMessage}>Carregando arquivos...</p>}
+          <div className={styles.searchBar}>
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Pesquisar por nome ou tipo de arquivo"
+              className={styles.searchInput}
+              aria-label="Pesquisar arquivos"
+            />
+          </div>
+
+          {loading && (
+            <p className={styles.emptyMessage}>Carregando arquivos...</p>
+          )}
           {error && <p className={styles.errorMessage}>{error}</p>}
-          {!loading && !error && files.length === 0 && (
+          {!loading && !error && filteredFiles.length === 0 && (
             <p className={styles.emptyMessage}>
-              Nenhum arquivo salvo ainda. Volte para enviar um arquivo novo.
+              {files.length === 0
+                ? "Nenhum arquivo salvo ainda. Volte para enviar um arquivo novo."
+                : `Nenhum arquivo encontrado para "${search}".`}
             </p>
           )}
 
-          {!loading && files.length > 0 && (
+          {!loading && filteredFiles.length > 0 && (
             <div className={styles.filesList}>
-              {files.map((file) => (
+              {filteredFiles.map((file) => (
                 <div key={file.id} className={styles.fileItem}>
                   <div className={styles.fileInfo}>
                     <span className={styles.fileName}>{file.nome}</span>
